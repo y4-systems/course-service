@@ -23,7 +23,12 @@ const validateTokenWithAuthService = async (token) => {
 const getEnrollmentCount = async (courseId) => {
   try {
     const res = await fetch(
-      `${GATEWAY_URL}/api/enrollments/course/${courseId}`
+      `${GATEWAY_URL}/api/enrollments/course/${courseId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SERVICE_TOKEN}`
+        }
+      }
     );
     if (!res.ok) return null;
     const data = await res.json();
