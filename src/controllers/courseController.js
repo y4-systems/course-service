@@ -120,6 +120,7 @@ const updateCapacity = async (req, res) => {
   }
 };
 // GET /courses/:courseId/check-student/:studentId
+// GET /courses/:courseId/check-student/:studentId
 const checkStudentEnrollment = async (req, res) => {
   try {
     const { courseId, studentId } = req.params;
@@ -135,9 +136,7 @@ const checkStudentEnrollment = async (req, res) => {
     res.json({
       courseId,
       studentId,
-      isEnrolled: status.isEnrolled ?? false,
-      status: status.status ?? null,
-      enrollment_id: status.enrollment_id ?? null
+      enrolled: status.isEnrolled ?? false
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
