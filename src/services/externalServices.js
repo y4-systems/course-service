@@ -68,21 +68,21 @@ const getEnrollmentCount = async (courseId) => {
 // His checkEnrollment returns: { isEnrolled: bool, status: string|null, enrollment_id }
 const checkEnrollmentStatus = async (studentId, courseId) => {
   try {
-    const url = `${GATEWAY_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`;
+    // ✅ Use ENROLLMENT_SERVICE_URL directly, not GATEWAY_URL
+    const url = `${ENROLLMENT_SERVICE_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`;
     console.log("Calling Enrollment Service:", url);
 
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`,
         "Cache-Control": "no-cache",
         Pragma: "no-cache"
+        // No Authorization header — bypassing gateway
       }
     });
 
     console.log("Enrollment service response status:", res.status);
 
     if (res.status === 304) {
-      // Can't read body from 304 — return a safe default
       console.warn("Got 304 from enrollment check — assuming not enrolled");
       return { isEnrolled: false, status: null };
     }
