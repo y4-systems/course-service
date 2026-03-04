@@ -1,4 +1,5 @@
 const Course = require("../models/Course");
+
 const {
   getEnrollmentCount,
   checkEnrollmentStatus
@@ -17,9 +18,12 @@ const getAllCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
-    if (!course) return res.status(404).json({ error: "Course not found" });
 
-    // Call Enrollment Service for live count
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    // call enrollment service
     const enrolledCount = await getEnrollmentCount(req.params.id);
 
     res.json({
@@ -131,7 +135,9 @@ const checkStudentEnrollment = async (req, res) => {
     res.json({
       courseId,
       studentId,
-      enrolled: status.enrolled ?? false
+      isEnrolled: status.isEnrolled ?? false,
+      status: status.status ?? null,
+      enrollment_id: status.enrollment_id ?? null
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

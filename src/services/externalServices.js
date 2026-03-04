@@ -64,9 +64,54 @@ const checkEnrollmentStatus = async (studentId, courseId) => {
     return null;
   }
 };
+// helper to call enrollment service
+const callEnrollmentService = async (endpoint) => {
+  try {
+    const url = `${GATEWAY_URL}${endpoint}`;
+
+    console.log("Calling Enrollment Service:", url);
+
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`
+      }
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Enrollment service error:", text);
+      return null;
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("Enrollment service unreachable:", err.message);
+    return null;
+  }
+};
+
+// get total enrollments for a course
+const getEnrollmentCount = async (courseId) => {
+  const data = await callEnrollmentService(
+    `/api/enrollments/course/${courseId}`
+  );
+
+  if (!data) return null;
+
+  return Array.isArray(data) ? data.length : (data.count ?? 0);
+};
+
+// check if a student is enrolled
+const checkEnrollmentStatus = async (studentId, courseId) => {
+  return await callEnrollmentService(
+    `/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
+  );
+};
 
 module.exports = {
   validateTokenWithAuthService,
+  getEnrollmentCount,
+  checkEnrollmentStatus,
   getEnrollmentCount,
   checkEnrollmentStatus
 };
