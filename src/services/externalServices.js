@@ -10,13 +10,24 @@ const callEnrollmentService = async (endpoint) => {
 
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`
+        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`,
+        // Prevent 304 by disabling conditional caching
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
       }
     });
 
+    console.log("Enrollment service response status:", res.status);
+
+    // 304 means "not modified" — treat it like a cache miss and return empty
+    if (res.status === 304) {
+      console.warn("Got 304 from enrollment service — returning empty array");
+      return [];
+    }
+
     if (!res.ok) {
       const text = await res.text();
-      console.error("Enrollment service error:", text);
+      console.error("Enrollment service error body:", text);
       return null;
     }
 
@@ -26,7 +37,6 @@ const callEnrollmentService = async (endpoint) => {
     return null;
   }
 };
-
 // Member 1 — validate JWT token via Auth Service
 const validateTokenWithAuthService = async (token) => {
   try {
@@ -63,22 +73,26 @@ const checkEnrollmentStatus = async (studentId, courseId) => {
   try {
     const url = `${GATEWAY_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`;
     console.log("Calling Enrollment Service:", url);
-    console.log(
-      "Using SERVICE_TOKEN:",
-      process.env.SERVICE_TOKEN ? "SET" : "NOT SET"
-    ); // add this
 
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`
+        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`,
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
       }
     });
 
-    console.log("Enrollment service response status:", res.status); // add this
+    console.log("Enrollment service response status:", res.status);
+
+    if (res.status === 304) {
+      // Can't read body from 304 — return a safe default
+      console.warn("Got 304 from enrollment check — assuming not enrolled");
+      return { isEnrolled: false, status: null };
+    }
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("Enrollment service error body:", text); // add this
+      console.error("Enrollment service error body:", text);
       return null;
     }
 
