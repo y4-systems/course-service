@@ -3,27 +3,24 @@ const GATEWAY_URL =
   "https://api-gateway-763150334229.us-central1.run.app";
 
 // ── Shared helper ─────────────────────────────────────────────────
+const ENROLLMENT_SERVICE_URL =
+  process.env.ENROLLMENT_SERVICE_URL ||
+  "https://enrollment-service-763150334229.us-central1.run.app";
+
 const callEnrollmentService = async (endpoint) => {
   try {
-    const url = `${GATEWAY_URL}${endpoint}`;
+    const url = `${ENROLLMENT_SERVICE_URL}${endpoint}`; // direct, not via gateway
     console.log("Calling Enrollment Service:", url);
 
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${process.env.SERVICE_TOKEN}`,
-        // Prevent 304 by disabling conditional caching
         "Cache-Control": "no-cache",
         Pragma: "no-cache"
+        // No Authorization header needed — gateway auth is bypassed
       }
     });
 
     console.log("Enrollment service response status:", res.status);
-
-    // 304 means "not modified" — treat it like a cache miss and return empty
-    if (res.status === 304) {
-      console.warn("Got 304 from enrollment service — returning empty array");
-      return [];
-    }
 
     if (!res.ok) {
       const text = await res.text();
