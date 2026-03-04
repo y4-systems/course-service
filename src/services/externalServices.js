@@ -50,12 +50,15 @@ const checkEnrollmentStatus = async (studentId, courseId) => {
       }
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Enrollment service error:", text);
+      throw new Error("Enrollment service responded with error");
+    }
 
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (err) {
-    console.error("❌ Enrollment check failed:", err.message);
+    console.error("❌ Enrollment check failed:", err);
     return null;
   }
 };
