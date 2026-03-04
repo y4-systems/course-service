@@ -35,19 +35,31 @@ const getCourseById = async (req, res) => {
 
 // POST /courses
 const createCourse = async (req, res) => {
-  const { name, description, capacity, credits } = req.body;
+  let { name, description, capacity, credits } = req.body;
+
   if (!name || !capacity || !credits) {
-    return res
-      .status(400)
-      .json({ error: "name, capacity, and credits are required" });
+    return res.status(400).json({
+      error: "name, capacity, and credits are required"
+    });
   }
+
+  capacity = Number(capacity);
+  credits = Number(credits);
+
+  if (isNaN(capacity) || isNaN(credits)) {
+    return res.status(400).json({
+      error: "capacity and credits must be numbers"
+    });
+  }
+
   try {
     const course = await Course.create({
-      name,
-      description,
+      name: String(name),
+      description: String(description || ""),
       capacity,
       credits
     });
+
     res.status(201).json(course);
   } catch (err) {
     res.status(500).json({ error: err.message });

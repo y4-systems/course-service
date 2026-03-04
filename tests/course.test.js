@@ -14,7 +14,7 @@ jest.mock("mongoose", () => {
 });
 
 const makeToken = (role = "student") =>
-  jwt.sign({ id: "507f1f77bcf86cd799439011", role }, "test_secret");
+  jwt.sign({ id: "507f1f77bcf86cd799439011", role }, process.env.JWT_SECRET);
 
 const adminToken = makeToken("admin");
 const studentToken = makeToken("student");
