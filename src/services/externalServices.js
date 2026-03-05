@@ -2,102 +2,137 @@ const GATEWAY_URL =
   process.env.GATEWAY_URL ||
   "https://api-gateway-763150334229.us-central1.run.app";
 
-// ── Shared helper ─────────────────────────────────────────────────
-const ENROLLMENT_SERVICE_URL =
-  process.env.ENROLLMENT_SERVICE_URL ||
-  "https://enrollment-service-763150334229.us-central1.run.app";
+const SERVICE_TOKEN = process.env.SERVICE_TOKEN;
 
-const callEnrollmentService = async (endpoint) => {
+// ── Shared Gateway Helper ─────────────────────────────────────────
+/**
+ * Makes authenticated requests through the API Gateway
+ * All external service calls should use this helper
+ */
+const callGateway = async (endpoint, options = {}) => {
   try {
-    const url = `${ENROLLMENT_SERVICE_URL}${endpoint}`; // direct, not via gateway
-    console.log("Calling Enrollment Service:", url);
+    const url = `${GATEWAY_URL}${endpoint}`;
+    console.log(`[Gateway] 🔄 Calling: ${url}`);
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      ...options.headers
+    };
+
+    // Add service-to-service authentication if token is available
+    if (SERVICE_TOKEN) {
+      headers["Authorization"] = `Bearer ${SERVICE_TOKEN}`;
+      console.log("[Gateway] 🔐 Using SERVICE_TOKEN for authentication");
+    } else {
+      console.warn("[Gateway] ⚠️  No SERVICE_TOKEN found - request may fail");
+    }
 
     const res = await fetch(url, {
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache"
-        // No Authorization header needed — gateway auth is bypassed
-      }
+      method: options.method || "GET",
+      ...options,
+      headers
     });
 
-    console.log("Enrollment service response status:", res.status);
+    console.log(`[Gateway] Response status: ${res.status} ${res.statusText}`);
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Enrollment service error body:", text);
+    // Handle 304 Not Modified
+    if (res.status === 304) {
+      console.warn(`[Gateway] Got 304 from ${endpoint}`);
       return null;
     }
 
-    return await res.json();
+    // Handle non-OK responses
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`[Gateway] ❌ Error response from ${endpoint}:`, text);
+      return null;
+    }
+
+    const data = await res.json();
+    console.log(`[Gateway] ✅ Success:`, JSON.stringify(data).substring(0, 200));
+    return data;
   } catch (err) {
-    console.error("Enrollment service unreachable:", err.message);
+    console.error(`[Gateway] 💥 Request failed for ${endpoint}:`, err.message);
     return null;
   }
 };
-// Member 1 — validate JWT token via Auth Service
+
+// ──────────────────────────────────────────────────────────────────
+// Member 1 — Auth Service Integration
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * Validates JWT token via Auth Service through the Gateway
+ * @param {string} token - JWT token to validate
+ * @returns {Promise<object|null>} - User data if valid, null otherwise
+ */
 const validateTokenWithAuthService = async (token) => {
-  try {
-    const res = await fetch(`${GATEWAY_URL}/api/auth/validate`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.error("❌ Auth Service unreachable:", err.message);
-    return null;
-  }
+  console.log("[Auth Service] Validating token through gateway...");
+  return await callGateway("/api/auth/validate", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
 };
 
-// Member 3 — get live enrollment count for a course
-// His getEnrollmentsByCourse returns: an array of enrollment objects
-// filtered to ACTIVE only makes the count accurate
+// ──────────────────────────────────────────────────────────────────
+// Member 3 — Enrollment Service Integration
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * Get live enrollment count for a course (ACTIVE enrollments only)
+ * Routes through Gateway to Member 3's Enrollment Service
+ * @param {string} courseId - Course ID
+ * @returns {Promise<number|null>} - Count of active enrollments or null
+ */
 const getEnrollmentCount = async (courseId) => {
-  const data = await callEnrollmentService(
-    `/api/enrollments/course/${courseId}`
-  );
+  console.log(`[Enrollment Service] 📊 Getting enrollment count for course: ${courseId}`);
+  
+  const data = await callGateway(`/api/enrollments/course/${courseId}`);
 
-  if (!Array.isArray(data)) return null;
+  if (!data) {
+    console.error(`[Enrollment Service] ❌ No data returned for course ${courseId}`);
+    return null;
+  }
 
-  // His endpoint returns all statuses for admin, so count only ACTIVE ones
+  if (!Array.isArray(data)) {
+    console.error(`[Enrollment Service] ❌ Invalid response format (expected array):`, typeof data);
+    return null;
+  }
+
+  // Count only ACTIVE enrollments (filter out DROPPED, PENDING, etc.)
   const activeCount = data.filter((e) => e.status === "ACTIVE").length;
+  
+  console.log(`[Enrollment Service] ✅ Course ${courseId}: ${activeCount} active / ${data.length} total enrollments`);
+  
   return activeCount;
 };
 
-// Member 3 — check if a student is enrolled in a course
-// His checkEnrollment returns: { isEnrolled: bool, status: string|null, enrollment_id }
+/**
+ * Check if a student is enrolled in a course
+ * Routes through Gateway to Member 3's Enrollment Service
+ * @param {string} studentId - Student ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<object|null>} - Enrollment status object or null
+ * Returns: { isEnrolled: boolean, status: string|null, enrollment_id: string|null }
+ */
 const checkEnrollmentStatus = async (studentId, courseId) => {
-  try {
-    // ✅ Use ENROLLMENT_SERVICE_URL directly, not GATEWAY_URL
-    const url = `${ENROLLMENT_SERVICE_URL}/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`;
-    console.log("Calling Enrollment Service:", url);
+  console.log(`[Enrollment Service] 🔍 Checking enrollment: student=${studentId}, course=${courseId}`);
+  
+  const data = await callGateway(
+    `/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
+  );
 
-    const res = await fetch(url, {
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache"
-        // No Authorization header — bypassing gateway
-      }
-    });
-
-    console.log("Enrollment service response status:", res.status);
-
-    if (res.status === 304) {
-      console.warn("Got 304 from enrollment check — assuming not enrolled");
-      return { isEnrolled: false, status: null };
-    }
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Enrollment service error body:", text);
-      return null;
-    }
-
-    return await res.json();
-  } catch (err) {
-    console.error("❌ Enrollment check failed:", err.message);
+  if (!data) {
+    console.error(`[Enrollment Service] ❌ Failed to check enrollment status`);
     return null;
   }
+
+  console.log(`[Enrollment Service] ✅ Status:`, data);
+  return data;
 };
 
 module.exports = {
