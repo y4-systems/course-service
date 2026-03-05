@@ -85,6 +85,6 @@ jobs:
           env_vars: |
             MONGO_URI=${{ secrets.MONGO_URI }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            AUTH_SERVICE_URL=${{ secrets.AUTH_SERVICE_URL }}
-            ENROLLMENT_SERVICE_URL=${{ secrets.ENROLLMENT_SERVICE_URL }}
+            GATEWAY_URL=${{ secrets.GATEWAY_URL }}
+            SERVICE_TOKEN=${{ secrets.SERVICE_TOKEN }}
       - run: echo "✅ Deployed course-service to Cloud Run"
