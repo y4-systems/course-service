@@ -46,7 +46,7 @@ const callGateway = async (endpoint, options = {}) => {
     }
 
     // Remove any protocol attempts (defense in depth)
-    const cleanEndpoint = endpoint.replace(/^(https?:\/\/|\/\/)/gi, "");
+    const cleanEndpoint = endpoint.replace(/^(?:https?:\/\/|\/\/)/gi, "");
     const normalizedEndpoint = cleanEndpoint.startsWith("/")
       ? cleanEndpoint
       : `/${cleanEndpoint}`;
@@ -71,7 +71,7 @@ const callGateway = async (endpoint, options = {}) => {
 
     // Add service-to-service authentication if token is available
     if (SERVICE_TOKEN) {
-      headers["Authorization"] = `Bearer ${SERVICE_TOKEN}`;
+      headers.Authorization = `Bearer ${SERVICE_TOKEN}`;
       console.log("[Gateway] 🔐 Using SERVICE_TOKEN for authentication");
     } else {
       console.warn("[Gateway] ⚠️  No SERVICE_TOKEN found - request may fail");
@@ -93,7 +93,7 @@ const callGateway = async (endpoint, options = {}) => {
 
     // Handle non-OK responses
     if (!res.ok) {
-      const text = await res.text();
+      await res.text(); // Read response to prevent memory leak
       console.error(`[Gateway] ❌ Error response received`);
       return null;
     }
@@ -127,15 +127,15 @@ const validateTokenWithAuthService = async (token) => {
         Authorization: `Bearer ${token}` // user token — must NOT be overwritten by SERVICE_TOKEN
       }
     });
-    if (!res.ok) {
-      console.error(
-        `[Auth Service] ❌ Validate failed: ${res.status} ${res.statusText}`
-      );
-      return null;
+    if (res.ok) {
+      const data = await res.json();
+      console.log("[Auth Service] ✅ Token validated successfully");
+      return data;
     }
-    const data = await res.json();
-    console.log("[Auth Service] ✅ Token validated successfully");
-    return data;
+    console.error(
+      `[Auth Service] ❌ Validate failed: ${res.status} ${res.statusText}`
+    );
+    return null;
   } catch (err) {
     console.error("[Auth Service] 💥 Request failed:", err.message);
     return null;
