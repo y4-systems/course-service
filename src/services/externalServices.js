@@ -1,8 +1,32 @@
+const mongoose = require("mongoose");
+
 const GATEWAY_URL =
   process.env.GATEWAY_URL ||
   "https://api-gateway-763150334229.us-central1.run.app";
 
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN;
+
+// ── Input Validation Helpers ──────────────────────────────────────
+/**
+ * Validate MongoDB ObjectId to prevent injection attacks
+ * @param {string} id - ID to validate
+ * @returns {boolean} - True if valid ObjectId
+ */
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+/**
+ * Sanitize endpoint path to prevent URL manipulation
+ * @param {string} endpoint - Endpoint path to sanitize
+ * @returns {string} - Sanitized endpoint
+ */
+const sanitizeEndpoint = (endpoint) => {
+  // Remove any protocol attempts
+  const sanitized = endpoint.replace(/^(https?:\/\/|\/\/)/gi, "");
+  // Ensure it starts with /
+  return sanitized.startsWith("/") ? sanitized : `/${sanitized}`;
+};
 
 // ── Shared Gateway Helper ─────────────────────────────────────────
 /**
@@ -11,7 +35,10 @@ const SERVICE_TOKEN = process.env.SERVICE_TOKEN;
  */
 const callGateway = async (endpoint, options = {}) => {
   try {
-    const url = `${GATEWAY_URL}${endpoint}`;
+    // Sanitize endpoint to prevent URL manipulation
+    const sanitizedEndpoint = sanitizeEndpoint(endpoint);
+    const url = `${GATEWAY_URL}${sanitizedEndpoint}`;
+
     console.log(`[Gateway] 🔄 Calling: ${url}`);
 
     const headers = {
@@ -39,14 +66,17 @@ const callGateway = async (endpoint, options = {}) => {
 
     // Handle 304 Not Modified
     if (res.status === 304) {
-      console.warn(`[Gateway] Got 304 from ${endpoint}`);
+      console.warn(`[Gateway] Got 304 from ${sanitizedEndpoint}`);
       return null;
     }
 
     // Handle non-OK responses
     if (!res.ok) {
       const text = await res.text();
-      console.error(`[Gateway] ❌ Error response from ${endpoint}:`, text);
+      console.error(
+        `[Gateway] ❌ Error response from ${sanitizedEndpoint}:`,
+        text
+      );
       return null;
     }
 
@@ -108,11 +138,21 @@ const validateTokenWithAuthService = async (token) => {
  * @returns {Promise<number|null>} - Count of active enrollments or null
  */
 const getEnrollmentCount = async (courseId) => {
+  // Validate courseId to prevent injection
+  if (!isValidObjectId(courseId)) {
+    console.error(
+      `[Enrollment Service] ❌ Invalid courseId format: ${courseId}`
+    );
+    return null;
+  }
+
   console.log(
     `[Enrollment Service] 📊 Getting enrollment count for course: ${courseId}`
   );
 
-  const data = await callGateway(`/api/enrollments/course/${courseId}`);
+  // Build endpoint with validated ID
+  const endpoint = `/api/enrollments/course/${courseId}`;
+  const data = await callGateway(endpoint);
 
   if (!data) {
     console.error(
@@ -148,13 +188,28 @@ const getEnrollmentCount = async (courseId) => {
  * Returns: { isEnrolled: boolean, status: string|null, enrollment_id: string|null }
  */
 const checkEnrollmentStatus = async (studentId, courseId) => {
+  // Validate both IDs to prevent injection
+  if (!isValidObjectId(studentId)) {
+    console.error(
+      `[Enrollment Service] ❌ Invalid studentId format: ${studentId}`
+    );
+    return null;
+  }
+
+  if (!isValidObjectId(courseId)) {
+    console.error(
+      `[Enrollment Service] ❌ Invalid courseId format: ${courseId}`
+    );
+    return null;
+  }
+
   console.log(
     `[Enrollment Service] 🔍 Checking enrollment: student=${studentId}, course=${courseId}`
   );
 
-  const data = await callGateway(
-    `/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
-  );
+  // Build endpoint with validated IDs
+  const endpoint = `/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`;
+  const data = await callGateway(endpoint);
 
   if (!data) {
     console.error(`[Enrollment Service] ❌ Failed to check enrollment status`);

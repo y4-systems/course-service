@@ -1,9 +1,16 @@
 const Course = require("../models/Course");
+const mongoose = require("mongoose");
 
 const {
   getEnrollmentCount,
   checkEnrollmentStatus
 } = require("../services/externalServices");
+
+// Helper function to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
 // GET /courses
 const getAllCourses = async (req, res) => {
   try {
@@ -17,13 +24,18 @@ const getAllCourses = async (req, res) => {
 // GET /courses/:id
 const getCourseById = async (req, res) => {
   try {
+    // Validate courseId to prevent injection
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: "Invalid course ID format" });
+    }
+
     const course = await Course.findById(req.params.id);
 
     if (!course) {
       return res.status(404).json({ error: "Course not found" });
     }
 
-    // call enrollment service
+    // Call enrollment service with validated ID
     const enrolledCount = await getEnrollmentCount(req.params.id);
 
     res.json({
@@ -72,6 +84,11 @@ const createCourse = async (req, res) => {
 
 // PUT /courses/:id
 const updateCourse = async (req, res) => {
+  // Validate courseId to prevent injection
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
+
   const { name, description, credits } = req.body;
   try {
     const course = await Course.findByIdAndUpdate(
@@ -92,6 +109,11 @@ const updateCourse = async (req, res) => {
 
 // PUT /courses/:id/capacity — called by Enrollment Service
 const updateCapacity = async (req, res) => {
+  // Validate courseId to prevent injection
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
+
   const { action } = req.body;
   if (!["increment", "decrement"].includes(action)) {
     return res
@@ -119,21 +141,26 @@ const updateCapacity = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-// GET /courses/:courseId/check-student/:studentId
+
 // GET /courses/:courseId/check-student/:studentId
 const checkStudentEnrollment = async (req, res) => {
   try {
     const { courseId, studentId } = req.params;
+
+    // Validate both IDs to prevent injection
+    if (!isValidObjectId(courseId)) {
+      return res.status(400).json({ error: "Invalid course ID format" });
+    }
+
+    if (!isValidObjectId(studentId)) {
+      return res.status(400).json({ error: "Invalid student ID format" });
+    }
+
     const status = await checkEnrollmentStatus(studentId, courseId);
 
     if (!status) {
       return res.status(503).json({
-        error: "Enrollment service unavailable",
-        debug: {
-          // remove before production
-          gatewayUrl: process.env.GATEWAY_URL,
-          hasToken: !!process.env.SERVICE_TOKEN
-        }
+        error: "Enrollment service unavailable"
       });
     }
 
