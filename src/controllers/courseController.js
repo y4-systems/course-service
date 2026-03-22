@@ -1,9 +1,15 @@
 const Course = require("../models/Course");
+const mongoose = require("mongoose");
 
 const {
   getEnrollmentCount,
   checkEnrollmentStatus
 } = require("../services/externalServices");
+
+// Validate MongoDB ObjectId to prevent path traversal
+const isValidObjectId = (id) =>
+  mongoose.Types.ObjectId.isValid(id) && /^[a-f\d]{24}$/i.test(id);
+
 // GET /courses
 const getAllCourses = async (req, res) => {
   try {
@@ -16,6 +22,9 @@ const getAllCourses = async (req, res) => {
 
 // GET /courses/:id
 const getCourseById = async (req, res) => {
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
   try {
     const course = await Course.findById(req.params.id);
 
@@ -72,6 +81,9 @@ const createCourse = async (req, res) => {
 
 // PUT /courses/:id
 const updateCourse = async (req, res) => {
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
   const { name, description, credits } = req.body;
   try {
     const course = await Course.findByIdAndUpdate(
@@ -92,6 +104,9 @@ const updateCourse = async (req, res) => {
 
 // PUT /courses/:id/capacity — called by Enrollment Service
 const updateCapacity = async (req, res) => {
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
   const { action } = req.body;
   if (!["increment", "decrement"].includes(action)) {
     return res
@@ -122,8 +137,16 @@ const updateCapacity = async (req, res) => {
 // GET /courses/:courseId/check-student/:studentId
 
 const checkStudentEnrollment = async (req, res) => {
+  const { courseId, studentId } = req.params;
+
+  if (!isValidObjectId(courseId)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
+  if (!isValidObjectId(studentId)) {
+    return res.status(400).json({ error: "Invalid student ID format" });
+  }
+
   try {
-    const { courseId, studentId } = req.params;
     const status = await checkEnrollmentStatus(studentId, courseId);
 
     if (!status) {
