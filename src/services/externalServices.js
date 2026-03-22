@@ -46,11 +46,11 @@ const buildGatewayUrl = (path) => {
  * @returns {boolean} - True if endpoint matches allowed patterns
  */
 const isAllowedEndpoint = (endpoint) => {
-  // Whitelist of allowed endpoint patterns
+  // Whitelist of allowed endpoint patterns (case-insensitive for ObjectIds)
   const allowedPatterns = [
     /^\/api\/auth\/validate$/,
-    /^\/api\/enrollments\/course\/[a-f0-9]{24}$/,
-    /^\/api\/enrollments\/check\?studentId=[a-f0-9]{24}&courseId=[a-f0-9]{24}$/
+    /^\/api\/enrollments\/course\/[a-f0-9]{24}$/i,
+    /^\/api\/enrollments\/check\?studentId=[a-f0-9]{24}&courseId=[a-f0-9]{24}$/i
   ];
 
   return allowedPatterns.some((pattern) => pattern.test(endpoint));
