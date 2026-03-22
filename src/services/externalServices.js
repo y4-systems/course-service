@@ -17,15 +17,19 @@ const isValidObjectId = (id) => {
 };
 
 /**
- * Sanitize endpoint path to prevent URL manipulation
- * @param {string} endpoint - Endpoint path to sanitize
- * @returns {string} - Sanitized endpoint
+ * Validate endpoint against allowed patterns
+ * @param {string} endpoint - Endpoint to validate
+ * @returns {boolean} - True if endpoint matches allowed patterns
  */
-const sanitizeEndpoint = (endpoint) => {
-  // Remove any protocol attempts
-  const sanitized = endpoint.replace(/^(https?:\/\/|\/\/)/gi, "");
-  // Ensure it starts with /
-  return sanitized.startsWith("/") ? sanitized : `/${sanitized}`;
+const isAllowedEndpoint = (endpoint) => {
+  // Whitelist of allowed endpoint patterns
+  const allowedPatterns = [
+    /^\/api\/auth\/validate$/,
+    /^\/api\/enrollments\/course\/[a-f0-9]{24}$/,
+    /^\/api\/enrollments\/check\?studentId=[a-f0-9]{24}&courseId=[a-f0-9]{24}$/
+  ];
+
+  return allowedPatterns.some((pattern) => pattern.test(endpoint));
 };
 
 // ── Shared Gateway Helper ─────────────────────────────────────────
@@ -35,29 +39,26 @@ const sanitizeEndpoint = (endpoint) => {
  */
 const callGateway = async (endpoint, options = {}) => {
   try {
-    // Sanitize endpoint to prevent URL manipulation
-    const sanitizedEndpoint = sanitizeEndpoint(endpoint);
-    const url = `${GATEWAY_URL}${sanitizedEndpoint}`;
-
-    // Validate that the constructed URL is safe and points to our gateway
-    try {
-      const parsedUrl = new URL(url);
-      const gatewayUrlObj = new URL(GATEWAY_URL);
-
-      // Ensure the URL uses the same protocol and host as GATEWAY_URL
-      if (
-        parsedUrl.protocol !== gatewayUrlObj.protocol ||
-        parsedUrl.host !== gatewayUrlObj.host
-      ) {
-        console.error(
-          "[Gateway] ❌ Invalid URL - does not match gateway domain"
-        );
-        return null;
-      }
-    } catch (err) {
-      console.error("[Gateway] ❌ Invalid URL format");
+    // Validate endpoint format before constructing URL
+    if (!endpoint.startsWith("/")) {
+      console.error("[Gateway] ❌ Invalid endpoint - must start with /");
       return null;
     }
+
+    // Remove any protocol attempts (defense in depth)
+    const cleanEndpoint = endpoint.replace(/^(https?:\/\/|\/\/)/gi, "");
+    const normalizedEndpoint = cleanEndpoint.startsWith("/")
+      ? cleanEndpoint
+      : `/${cleanEndpoint}`;
+
+    // Validate against whitelist
+    if (!isAllowedEndpoint(normalizedEndpoint)) {
+      console.error("[Gateway] ❌ Endpoint not in whitelist");
+      return null;
+    }
+
+    // Construct URL using only validated components
+    const requestUrl = `${GATEWAY_URL}${normalizedEndpoint}`;
 
     console.log(`[Gateway] 🔄 Making API request`);
 
@@ -76,7 +77,7 @@ const callGateway = async (endpoint, options = {}) => {
       console.warn("[Gateway] ⚠️  No SERVICE_TOKEN found - request may fail");
     }
 
-    const res = await fetch(url, {
+    const res = await fetch(requestUrl, {
       method: options.method || "GET",
       ...options,
       headers
