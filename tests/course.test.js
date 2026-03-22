@@ -96,7 +96,7 @@ describe("PUT /courses/:id/capacity", () => {
 describe("GET /courses/:courseId/check-student/:studentId", () => {
   it("returns enrollment status", async () => {
     const res = await request(app).get(
-      "/courses/507f1f77bcf86cd799439011/check-student/123"
+      "/courses/507f1f77bcf86cd799439011/check-student/507f1f77bcf86cd799439012"
     );
 
     expect(res.status).toBe(200);
