@@ -50,7 +50,9 @@ app.get("/diagnostics/test-gateway", async (req, res) => {
     console.log("DIAGNOSTIC: Testing API Gateway Connectivity");
     console.log("=".repeat(60));
 
-    const gatewayUrl = process.env.GATEWAY_URL || "https://api-gateway-763150334229.us-central1.run.app";
+    const gatewayUrl =
+      process.env.GATEWAY_URL ||
+      "https://api-gateway-763150334229.us-central1.run.app";
     const hasToken = !!process.env.SERVICE_TOKEN;
 
     console.log(`Gateway URL: ${gatewayUrl}`);
@@ -64,7 +66,9 @@ app.get("/diagnostics/test-gateway", async (req, res) => {
         headers: { "Cache-Control": "no-cache" }
       });
       gatewayReachable = healthCheck.ok;
-      console.log(`Gateway health check: ${healthCheck.status} ${healthCheck.statusText}`);
+      console.log(
+        `Gateway health check: ${healthCheck.status} ${healthCheck.statusText}`
+      );
     } catch (err) {
       console.error(`Gateway unreachable: ${err.message}`);
     }
@@ -77,12 +81,16 @@ app.get("/diagnostics/test-gateway", async (req, res) => {
         gatewayUrl,
         hasServiceToken: hasToken,
         gatewayReachable,
-        status: gatewayReachable ? "✅ Gateway is accessible" : "❌ Gateway is unreachable"
+        status: gatewayReachable
+          ? "✅ Gateway is accessible"
+          : "❌ Gateway is unreachable"
       },
-      recommendations: !hasToken ? [
-        "Set SERVICE_TOKEN environment variable",
-        "Token is required for authenticated gateway requests"
-      ] : [],
+      recommendations: !hasToken
+        ? [
+            "Set SERVICE_TOKEN environment variable",
+            "Token is required for authenticated gateway requests"
+          ]
+        : [],
       nextSteps: [
         "Test enrollment integration: GET /diagnostics/test-enrollment/:courseId",
         "Check environment: GET /diagnostics/env"
@@ -99,10 +107,18 @@ app.get("/diagnostics/test-gateway", async (req, res) => {
 app.get("/diagnostics/test-enrollment/:courseId", async (req, res) => {
   try {
     const { courseId } = req.params;
+
+    // Validate courseId to prevent path traversal
+    if (!/^[a-f\d]{24}$/i.test(courseId)) {
+      return res.status(400).json({ error: "Invalid course ID format" });
+    }
+
     const { getEnrollmentCount } = require("./services/externalServices");
 
     console.log("\n" + "=".repeat(60));
-    console.log(`DIAGNOSTIC: Testing Enrollment Service for Course ${courseId}`);
+    console.log(
+      `DIAGNOSTIC: Testing Enrollment Service for Course ${courseId}`
+    );
     console.log("=".repeat(60));
 
     const enrollmentCount = await getEnrollmentCount(courseId);
@@ -115,20 +131,24 @@ app.get("/diagnostics/test-enrollment/:courseId", async (req, res) => {
       results: {
         success: enrollmentCount !== null,
         enrollmentCount: enrollmentCount ?? "unavailable",
-        status: enrollmentCount !== null 
-          ? `✅ Successfully retrieved ${enrollmentCount} active enrollments`
-          : "❌ Failed to retrieve enrollment data"
+        status:
+          enrollmentCount !== null
+            ? `✅ Successfully retrieved ${enrollmentCount} active enrollments`
+            : "❌ Failed to retrieve enrollment data"
       },
       configuration: {
         gatewayUrl: process.env.GATEWAY_URL || "not set",
         hasServiceToken: !!process.env.SERVICE_TOKEN
       },
-      troubleshooting: enrollmentCount === null ? [
-        "Verify SERVICE_TOKEN is set correctly",
-        "Check that API Gateway is routing /api/enrollments/* to Enrollment Service",
-        "Verify Enrollment Service is running and accessible",
-        "Check Cloud Run logs for both services"
-      ] : []
+      troubleshooting:
+        enrollmentCount === null
+          ? [
+              "Verify SERVICE_TOKEN is set correctly",
+              "Check that API Gateway is routing /api/enrollments/* to Enrollment Service",
+              "Verify Enrollment Service is running and accessible",
+              "Check Cloud Run logs for both services"
+            ]
+          : []
     });
   } catch (err) {
     res.status(500).json({
@@ -143,14 +163,26 @@ app.get("/diagnostics/env", (req, res) => {
     environment: {
       NODE_ENV: process.env.NODE_ENV || "not set",
       PORT: process.env.PORT || "not set (using default 3000)",
-      GATEWAY_URL: process.env.GATEWAY_URL ? "✓ Set" : "✗ Not set (using default)",
-      GATEWAY_URL_VALUE: process.env.GATEWAY_URL || "https://api-gateway-763150334229.us-central1.run.app (default)",
-      SERVICE_TOKEN: process.env.SERVICE_TOKEN ? "✓ Set (hidden for security)" : "✗ Not set",
-      MONGO_URI: process.env.MONGO_URI ? "✓ Set (hidden for security)" : "✗ Not set",
-      JWT_SECRET: process.env.JWT_SECRET ? "✓ Set (hidden for security)" : "✗ Not set"
+      GATEWAY_URL: process.env.GATEWAY_URL
+        ? "✓ Set"
+        : "✗ Not set (using default)",
+      GATEWAY_URL_VALUE:
+        process.env.GATEWAY_URL ||
+        "https://api-gateway-763150334229.us-central1.run.app (default)",
+      SERVICE_TOKEN: process.env.SERVICE_TOKEN
+        ? "✓ Set (hidden for security)"
+        : "✗ Not set",
+      MONGO_URI: process.env.MONGO_URI
+        ? "✓ Set (hidden for security)"
+        : "✗ Not set",
+      JWT_SECRET: process.env.JWT_SECRET
+        ? "✓ Set (hidden for security)"
+        : "✗ Not set"
     },
     warnings: [
-      ...(!process.env.SERVICE_TOKEN ? ["⚠️  SERVICE_TOKEN not set - inter-service calls may fail"] : []),
+      ...(!process.env.SERVICE_TOKEN
+        ? ["⚠️  SERVICE_TOKEN not set - inter-service calls may fail"]
+        : []),
       ...(!process.env.MONGO_URI ? ["⚠️  MONGO_URI not set"] : []),
       ...(!process.env.JWT_SECRET ? ["⚠️  JWT_SECRET not set"] : [])
     ],

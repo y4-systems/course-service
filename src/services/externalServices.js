@@ -4,6 +4,9 @@ const GATEWAY_URL =
 
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN;
 
+// Validate MongoDB ObjectId to prevent path traversal
+const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(String(id || "").trim());
+
 // ── Shared Gateway Helper ─────────────────────────────────────────
 /**
  * Makes authenticated requests through the API Gateway
@@ -112,6 +115,13 @@ const getEnrollmentCount = async (courseId) => {
     `[Enrollment Service] 📊 Getting enrollment count for course: ${courseId}`
   );
 
+  if (!isValidObjectId(courseId)) {
+    console.error(
+      `[Enrollment Service] ❌ Invalid courseId format: ${courseId}`
+    );
+    return null;
+  }
+
   const data = await callGateway(`/api/enrollments/course/${courseId}`);
 
   if (!data) {
@@ -151,6 +161,13 @@ const checkEnrollmentStatus = async (studentId, courseId) => {
   console.log(
     `[Enrollment Service] 🔍 Checking enrollment: student=${studentId}, course=${courseId}`
   );
+
+  if (!isValidObjectId(studentId) || !isValidObjectId(courseId)) {
+    console.error(
+      `[Enrollment Service] ❌ Invalid ID format: student=${studentId}, course=${courseId}`
+    );
+    return null;
+  }
 
   const data = await callGateway(
     `/api/enrollments/check?studentId=${studentId}&courseId=${courseId}`
