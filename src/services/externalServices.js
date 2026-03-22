@@ -17,6 +17,30 @@ const isValidObjectId = (id) => {
 };
 
 /**
+ * Build safe URL using URL constructor (not string concatenation)
+ * @param {string} path - API path
+ * @returns {string|null} - Safe URL or null if invalid
+ */
+const buildGatewayUrl = (path) => {
+  try {
+    // Use URL constructor to safely build URL
+    const url = new URL(path, GATEWAY_URL);
+
+    // Ensure the final URL has the same origin as GATEWAY_URL
+    const gatewayOrigin = new URL(GATEWAY_URL).origin;
+    if (url.origin !== gatewayOrigin) {
+      console.error("[Gateway] ❌ URL origin mismatch");
+      return null;
+    }
+
+    return url.toString();
+  } catch (err) {
+    console.error("[Gateway] ❌ Invalid URL construction");
+    return null;
+  }
+};
+
+/**
  * Validate endpoint against allowed patterns
  * @param {string} endpoint - Endpoint to validate
  * @returns {boolean} - True if endpoint matches allowed patterns
@@ -45,20 +69,18 @@ const callGateway = async (endpoint, options = {}) => {
       return null;
     }
 
-    // Remove any protocol attempts (defense in depth)
-    const cleanEndpoint = endpoint.replace(/^(?:https?:\/\/|\/\/)/gi, "");
-    const normalizedEndpoint = cleanEndpoint.startsWith("/")
-      ? cleanEndpoint
-      : `/${cleanEndpoint}`;
-
     // Validate against whitelist
-    if (!isAllowedEndpoint(normalizedEndpoint)) {
+    if (!isAllowedEndpoint(endpoint)) {
       console.error("[Gateway] ❌ Endpoint not in whitelist");
       return null;
     }
 
-    // Construct URL using only validated components
-    const requestUrl = `${GATEWAY_URL}${normalizedEndpoint}`;
+    // Build URL using URL constructor (NOT string concatenation)
+    const requestUrl = buildGatewayUrl(endpoint);
+    if (!requestUrl) {
+      console.error("[Gateway] ❌ Failed to build safe URL");
+      return null;
+    }
 
     console.log(`[Gateway] 🔄 Making API request`);
 
@@ -119,7 +141,12 @@ const callGateway = async (endpoint, options = {}) => {
 const validateTokenWithAuthService = async (token) => {
   console.log("[Auth Service] Validating token through gateway...");
   try {
-    const url = `${GATEWAY_URL}/api/auth/validate`;
+    const url = buildGatewayUrl("/api/auth/validate");
+    if (!url) {
+      console.error("[Auth Service] ❌ Failed to build URL");
+      return null;
+    }
+
     const res = await fetch(url, {
       method: "GET",
       headers: {
@@ -127,6 +154,7 @@ const validateTokenWithAuthService = async (token) => {
         Authorization: `Bearer ${token}` // user token — must NOT be overwritten by SERVICE_TOKEN
       }
     });
+
     if (res.ok) {
       const data = await res.json();
       console.log("[Auth Service] ✅ Token validated successfully");
